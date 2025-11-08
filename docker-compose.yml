@@ -1,0 +1,101 @@
+version: '3.8'
+
+x-base: &base
+  build:
+    dockerfile: develop.Dockerfile
+  entrypoint: echo 'ok!'
+  tty: true
+  stdin_open: true
+  volumes:
+    - ./:/app
+  working_dir: /app
+  environment:
+    NODE_ENV: development
+    AMQP_URL: amqp://guest:guest@rabbitmq:5672?frameMax=8192
+    BASE_URL: http://web:9876
+    REDIS_URL: redis://redis:6379
+    STORAGE_ENDPOINT: http://minio:9000
+    GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
+
+x-minio: &minio
+  image: quay.io/minio/minio:latest
+  command: server --console-address ":9001" --address ":9000" /data
+  env_file: .env
+  expose:
+    - 9000:9000
+    - 9001:9001
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+    interval: 30s
+    timeout: 20s
+    retries: 3
+
+services:
+  web:
+    <<: *base
+    restart: on-failure
+    entrypoint: sh -c 'wait-for redis:6379 rabbitmq:5672 -- yarn web-dev'
+    ports:
+      - 9876:9876
+    depends_on:
+      - worker
+
+  worker:
+    <<: *base
+    restart: on-failure
+    entrypoint: sh -c 'wait-for redis:6379 rabbitmq:5672 -- yarn worker-dev'
+    depends_on:
+      - redis
+      - rabbitmq
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    restart: on-failure
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+
+  redis:
+    image: redis:7-alpine
+    restart: on-failure
+    volumes:
+      - redis:/data
+    command: redis-server --appendonly yes
+    ports:
+      - 6379:6379
+
+  minio:
+    <<: *minio
+    restart: on-failure
+    ports:
+      - 9000:9000
+      - 9001:9001
+    volumes:
+      - minio:/data
+    entrypoint: |
+      /bin/sh -c "
+      echo 'Starting Minio and setting up project bucket...' &&
+      /usr/bin/minio server --console-address ':9001' --address ':9000' /data &
+      ## Wait for minio to be ready
+      until (echo > /dev/tcp/localhost/9000) >/dev/null 2>&1; do
+        echo 'Waiting for minio to be ready...'
+        sleep 5
+      done &&
+      ## Configure bucket
+      /usr/bin/mc alias set local http://localhost:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD &&
+      if ! /usr/bin/mc ls local/$STORAGE_BUCKET_NAME > /dev/null 2>&1; then
+        /usr/bin/mc mb local/$STORAGE_BUCKET_NAME &&
+        echo 'Bucket created successfully'
+      else
+        echo 'Bucket already exists, skipping creation'
+      fi &&
+      ## Keep container running
+      wait
+      "
+
+volumes:
+  rabbitmq:
+  redis:
+  minio:
