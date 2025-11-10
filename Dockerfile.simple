@@ -1,5 +1,5 @@
 # Dockerfile Simplificado - Usa imagem oficial como base
-# Para build completo do código, use: Dockerfile.full
+# Esta versão evita o build pesado do TypeScript
 
 FROM clairton/unoapi-cloud:2.4.1
 
@@ -12,7 +12,8 @@ LABEL \
   org.opencontainers.image.vendor="https://github.com/Bluebytedev" \
   org.opencontainers.image.licenses="GPLv3"
 
-# Adicione suas customizações aqui se necessário
+# Se você quiser adicionar customizações, faça aqui
 # Exemplo: COPY ./custom-config.json /home/u/app/config.json
 
+# Mantém o mesmo entrypoint da imagem oficial
 ENTRYPOINT yarn start
