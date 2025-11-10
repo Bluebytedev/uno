@@ -1,0 +1,120 @@
+version: '3'
+
+x-base: &base
+  image: ghcr.io/bluebytedev/uno:latest
+  entrypoint: echo 'ok!'
+  networks:
+    - minio
+    - rabbitmq
+    - redis
+  environment:
+    NODE_OPTIONS: --max-old-space-size=14096
+    
+    # --- Conexões ---
+    AMQP_URL: ${AMQP_URL}
+    REDIS_URL: ${REDIS_URL}
+    BASE_URL: ${BASE_URL}
+
+    # --- Storage / S3 ---
+    STORAGE_REGION: ${STORAGE_REGION:-sa-east-1}
+    STORAGE_BUCKET_NAME: ${STORAGE_BUCKET_NAME}
+    STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID}
+    STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY}
+    STORAGE_ENDPOINT: ${STORAGE_ENDPOINT}
+    STORAGE_FORCE_PATH_STYLE: ${STORAGE_FORCE_PATH_STYLE:-true}
+
+    # --- Regras de ignorar mensagens ---
+    IGNORE_GROUP_MESSAGES: ${IGNORE_GROUP_MESSAGES:-true}
+    IGNORE_OWN_MESSAGES: ${IGNORE_OWN_MESSAGES:-true}
+    IGNORE_YOURSELF_MESSAGES: ${IGNORE_YOURSELF_MESSAGES:-true}
+    IGNORE_BROADCAST_STATUSES: ${IGNORE_BROADCAST_STATUSES:-true}
+    IGNORE_STATUS_MESSAGE: ${IGNORE_STATUS_MESSAGE:-true}
+    IGNORE_BROADCAST_MESSAGES: ${IGNORE_BROADCAST_MESSAGES:-true}
+    IGNORE_HISTORY_MESSAGES: ${IGNORE_HISTORY_MESSAGES:-true}
+
+    # --- Envio / comportamento extra ---
+    SEND_CONNECTION_STATUS: ${SEND_CONNECTION_STATUS:-false}
+    SEND_REACTION_AS_REPLY: ${SEND_REACTION_AS_REPLY:-false}
+    SEND_PROFILE_PICTURE: ${SEND_PROFILE_PICTURE:-false}
+
+    # --- Delays (ms) ---
+    UNOAPI_DELAY_AFTER_FIRST_MESSAGE_WEBHOOK_MS: ${UNOAPI_DELAY_AFTER_FIRST_MESSAGE_WEBHOOK_MS:-1000}
+    UNOAPI_DELAY_AFTER_FIRST_MESSAGE_MS: ${UNOAPI_DELAY_AFTER_FIRST_MESSAGE_MS:-1000}
+    UNOAPI_DELAY_BETWEEN_MESSAGES_MS: ${UNOAPI_DELAY_BETWEEN_MESSAGES_MS:-1000}
+
+    # --- Webhook / auth ---
+    WEBHOOK_URL: ${WEBHOOK_URL}
+    WEBHOOK_TOKEN: ${WEBHOOK_TOKEN}
+    WEBHOOK_HEADER: ${WEBHOOK_HEADER}
+    UNOAPI_AUTH_TOKEN: ${UNOAPI_AUTH_TOKEN}
+
+    # --- Locale / templates ---
+    DEFAULT_LOCALE: ${DEFAULT_LOCALE:-pt_BR}
+    ONLY_HELLO_TEMPLATE: ${ONLY_HELLO_TEMPLATE:-true}
+
+    # --- Limpeza / sessão ---
+    CLEAN_CONFIG_ON_DISCONNECT: ${CLEAN_CONFIG_ON_DISCONNECT:-true}
+    CONFIG_SESSION_PHONE_CLIENT: ${CONFIG_SESSION_PHONE_CLIENT:-IA Result}
+
+    # --- Outros ---
+    LOG_LEVEL: ${LOG_LEVEL:-debug}
+    UNO_LOG_LEVEL: ${UNO_LOG_LEVEL:-debug}
+    REJECT_CALLS: ${REJECT_CALLS:-''}
+    REJECT_CALLS_WEBHOOK: ${REJECT_CALLS_WEBHOOK:-''}
+    WEBHOOK_SEND_NEW_MESSAGES: ${WEBHOOK_SEND_NEW_MESSAGES:-false}
+    NOTIFY_FAILED_MESSAGES: ${NOTIFY_FAILED_MESSAGES:-false}
+    UNOAPI_QUEUE_NAME: ${UNOAPI_QUEUE_NAME:-iaresult}
+    CONNECTING_TIMEOUT_MS: ${CONNECTING_TIMEOUT_MS:-180000}
+    WHATSAPP_VERSION: '[2, 3000, 1028395461]'
+    
+  restart: 'no'
+
+services:
+  web:
+    <<: *base
+    entrypoint: yarn web
+    restart: always
+    ports:
+      - "9876:9876"
+    deploy:
+      resources:
+        limits:
+          cpus: '5.80'
+          memory: 12256M
+        reservations:
+          cpus: '5.85'
+          memory: 1128M
+
+  broker:
+    <<: *base
+    entrypoint: yarn broker
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '5.50'
+          memory: 12256M
+        reservations:
+          cpus: '5.25'
+          memory: 12128M
+
+  bridge:
+    <<: *base
+    entrypoint: yarn bridge
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '5.50'
+          memory: 12256M
+        reservations:
+          cpus: '5.95'
+          memory: 12128M
+
+networks:
+  redis:
+    external: true
+  rabbitmq:
+    external: true
+  minio:
+    external: true
