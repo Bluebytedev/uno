@@ -1,6 +1,7 @@
 FROM node:22-alpine AS builder
 
 ENV NODE_ENV=development
+ENV NODE_OPTIONS=--max-old-space-size=4096
 
 RUN apk --update --no-cache add git
 
@@ -8,7 +9,7 @@ WORKDIR /app
 
 ADD ./package.json ./package.json
 ADD ./yarn.lock ./yarn.lock
-RUN yarn
+RUN yarn install --frozen-lockfile --network-timeout 600000
 
 ADD ./src ./src
 ADD ./public ./public
@@ -38,7 +39,7 @@ COPY --from=builder /app/yarn.lock ./yarn.lock
 
 
 RUN apk --update --no-cache add git ffmpeg
-RUN yarn
+RUN yarn install --production --frozen-lockfile --network-timeout 600000
 RUN apk del git
 
 ENTRYPOINT yarn start
